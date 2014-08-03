@@ -143,7 +143,23 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
     show_list(io, args, ", ", indent)
 
     ind = is(head, :module) ? indent : indent + indent_width
-    exs = (is_expr(body, :block) || is_expr(body, :body)) ? body.args : {body}
+    local exs
+    if is_expr(body, :block) || is_expr(body, :body)
+        if !isempty(body.args) && isa(body.args[1], Expr) && (body.args[1]::Expr).head == :boundscheck
+            # Print as @inbounds ...
+            exblock = copy(body.args[2])
+            pop!(exblock.args)  # remove the Expr(:boundscheck, :(Base.pop))
+            if (body.args[1]::Expr).args[1] == false
+                print(io, '\n', " "^(indent+indent_width), "@inbounds ")
+            end
+            show_block(io, "begin", exblock, indent+indent_width)
+            print(io, "end", '\n', " "^indent)
+            return
+        end
+        exs = body.args
+    else
+        exs = {body}
+    end
     for ex in exs
         if !is_linenumber(ex); print(io, '\n', " "^ind); end
         show_unquoted(io, ex, ind)
@@ -384,15 +400,7 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
     elseif is(head, :let) && nargs >= 1
         show_block(io, "let", args[2:end], args[1], indent); print(io, "end")
     elseif is(head, :block) || is(head, :body)
-        if !isempty(ex.args) && isa(ex.args[1], Expr) && (ex.args[1]::Expr).head == :boundscheck && (ex.args[1]::Expr).args[1] == false
-            exblock = copy(ex.args[2])
-            pop!(exblock.args)  # remove the Expr(:boundscheck, :(Base.pop))
-            print(io, "@inbounds ")
-            show_block(io, "begin", exblock, indent)
-            print(io, "end")
-        else
-            show_block(io, "begin", ex, indent); print(io, "end")
-        end
+        show_block(io, "begin", ex, indent); print(io, "end")
     elseif is(head, :quote) && nargs == 1
         show_unquoted_quote_expr(io, args[1], indent, 0)
     elseif is(head, :gotoifnot) && nargs == 2
