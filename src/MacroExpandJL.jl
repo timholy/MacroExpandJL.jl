@@ -1,7 +1,5 @@
 module MacroExpandJL
 
-import Base: print, show
-
 export macroexpand_jl
 
 macroexpand_jl(io::IO, ex::Expr) = (show_unquoted(io, macroexpand(ex)); print(io, "\n"))
@@ -53,8 +51,6 @@ end
 
 typealias ExprNode Union(Expr, QuoteNode, SymbolNode, LineNumberNode,
                          LabelNode, GotoNode, TopNode)
-print        (io::IO, ex::ExprNode)    = show_unquoted(io, ex)
-show         (io::IO, ex::ExprNode)    = show_unquoted(io, QuoteNode(ex))
 show_unquoted(io::IO, ex)              = show_unquoted(io, ex, 0, 0)
 show_unquoted(io::IO, ex, indent::Int) = show_unquoted(io, ex, indent, 0)
 show_unquoted(io::IO, ex, ::Int,::Int) = show(io, ex)
@@ -434,7 +430,11 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
         show(io, ex.head)
         for arg in args
             print(io, ", ")
-            show(io, arg)
+            if isa(arg, ExprNode)
+                show_unquoted(io, arg)
+            else
+                show(io, arg)
+            end
         end
         print(io, "))")
     end
