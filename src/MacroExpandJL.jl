@@ -158,7 +158,7 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
         end
         exs = body.args
     else
-        exs = [body]
+        exs = Any[body]
     end
     for ex in exs
         if !is_linenumber(ex); print(io, '\n', " "^ind); end
@@ -166,12 +166,12 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
     end
     print(io, '\n', " "^indent)
 end
-show_block(io::IO,head,block,i::Int) = show_block(io,head,[],block,i)
+show_block(io::IO,head,block,i::Int) = show_block(io,head,Any[],block,i)
 function show_block(io::IO, head, arg, block, i::Int)
     if is_expr(arg, :block)
         show_block(io, head, arg.args, block, i)
     else
-        show_block(io, head, [arg], block, i)
+        show_block(io, head, Any[arg], block, i)
     end
 end
 
