@@ -49,8 +49,8 @@ end
 #   eval(parse("Set{Int64}([2,3,1])”) # ==> An actual set
 # While this isn’t true of ALL show methods, it is of all ASTs.
 
-typealias ExprNode Union(Expr, QuoteNode, SymbolNode, LineNumberNode,
-                         LabelNode, GotoNode, TopNode)
+typealias ExprNode Union{Expr, QuoteNode, SymbolNode, LineNumberNode,
+                         LabelNode, GotoNode, TopNode}
 show_unquoted(io::IO, ex)              = show_unquoted(io, ex, 0, 0)
 show_unquoted(io::IO, ex, indent::Int) = show_unquoted(io, ex, indent, 0)
 show_unquoted(io::IO, ex, ::Int,::Int) = show(io, ex)
@@ -77,20 +77,20 @@ const bin_ops_by_prec = [
     "::",
     "."
 ]
-const bin_op_precs = Dict{Symbol,Int}(merge([{symbol(op)=>i for op=split(bin_ops_by_prec[i])} for i=1:length(bin_ops_by_prec)]...))
+const bin_op_precs = Dict{Symbol,Int}(merge([Dict{Any, Any}([symbol(op)=>i for op=split(bin_ops_by_prec[i])]) for i=1:length(bin_ops_by_prec)]...))
 const bin_ops = Set{Symbol}(keys(bin_op_precs))
 const expr_infix_wide = Set([:(=), :(+=), :(-=), :(*=), :(/=), :(\=), :(&=),
     :(|=), :($=), :(>>>=), :(>>=), :(<<=), :(&&), :(||)])
 const expr_infix = Set([:(:), :(<:), :(->), :(=>), symbol("::")])
-const expr_calls  = [:call =>('(',')'), :ref =>('[',']'), :curly =>('{','}')]
-const expr_parens = [:tuple=>('(',')'), :vcat=>('[',']'), :cell1d=>('{','}'),
-                     :hcat =>('[',']'), :row =>('[',']')]
+const expr_calls  = Dict(:call =>('(',')'), :ref =>('[',']'), :curly =>('{','}'))
+const expr_parens = Dict(:tuple=>('(',')'), :vcat=>('[',']'), :cell1d=>('{','}'),
+                     :hcat =>('[',']'), :row =>('[',']'))
 
 ## AST decoding helpers ##
 
-is_id_start_char(c::Char) = ccall(:jl_id_start_char, Cint, (Uint32,), c) != 0
-is_id_char(c::Char) = ccall(:jl_id_char, Cint, (Uint32,), c) != 0
-function isidentifier(s::String)
+is_id_start_char(c::Char) = ccall(:jl_id_start_char, Cint, (UInt32,), c) != 0
+is_id_char(c::Char) = ccall(:jl_id_char, Cint, (UInt32,), c) != 0
+function isidentifier(s::AbstractString)
     i = start(s)
     done(s, i) && return false
     (c, i) = next(s, i)
@@ -101,8 +101,8 @@ function isidentifier(s::String)
     end
     return true
 end
-isoperator(s::ByteString) = ccall(:jl_is_operator, Cint, (Ptr{Uint8},), s) != 0
-isoperator(s::String) = isoperator(bytestring(s))
+isoperator(s::ByteString) = ccall(:jl_is_operator, Cint, (Ptr{UInt8},), s) != 0
+isoperator(s::AbstractString) = isoperator(bytestring(s))
 
 is_expr(ex, head::Symbol)         = (isa(ex, Expr) && (ex.head == head))
 is_expr(ex, head::Symbol, n::Int) = is_expr(ex, head) && length(ex.args) == n
@@ -158,7 +158,7 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
         end
         exs = body.args
     else
-        exs = {body}
+        exs = [body]
     end
     for ex in exs
         if !is_linenumber(ex); print(io, '\n', " "^ind); end
@@ -166,12 +166,12 @@ function show_block(io::IO, head, args::Vector, body, indent::Int)
     end
     print(io, '\n', " "^indent)
 end
-show_block(io::IO,head,    block,i::Int) = show_block(io,head,{},   block,i)
+show_block(io::IO,head,block,i::Int) = show_block(io,head,[],block,i)
 function show_block(io::IO, head, arg, block, i::Int)
     if is_expr(arg, :block)
         show_block(io, head, arg.args, block, i)
     else
-        show_block(io, head, {arg}, block, i)
+        show_block(io, head, [arg], block, i)
     end
 end
 
@@ -406,7 +406,7 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
     elseif is(head, :gotoifnot) && nargs == 2
         print(io, "unless ")
         show_list(io, args, " goto ", indent)
-    elseif is(head, :string) && nargs == 1 && isa(args[1], String)
+    elseif is(head, :string) && nargs == 1 && isa(args[1], AbstractString)
         show(io, args[1])
     elseif is(head, :null)
         print(io, "nothing")
@@ -416,7 +416,7 @@ function show_unquoted(io::IO, ex::Expr, indent::Int, prec::Int)
         show_unquoted(io, args[2], indent+indent_width)
     elseif is(head, :string)
         a = map(args) do x
-            if !isa(x,String)
+            if !isa(x,AbstractString)
                 if isa(x,Symbol) && !(x in quoted_syms)
                     string("\$", x)
                 else
